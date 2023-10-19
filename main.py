@@ -64,27 +64,13 @@ if __name__=='__main__':
             LCD.text("Automatic",2,86,LCD.WHITE)
 
             
-        def mode_highlight(mode):
-            pos = 0
-            if mode == 0:
-                pos = 0
-            elif mode == 1:
-                pos = 20
-            elif mode == 2:
-                pos = 40
-            elif mode == 3:
-                pos = 60
-            elif mode == 4:
-                pos = 80
-            elif mode == 5:
-                pos = 100
-                
 
-            #hightlight
-            LCD.fill_rect(0,pos,160,20,LCD.RED)
         #bg
-        LCD.fill_rect(0,0,160,128,LCD.BLACK)    
-        mode_highlight(mode)
+        LCD.fill_rect(0,0,160,128,LCD.BLACK)     
+        #hightlight
+        pos = mode * 20
+        LCD.fill_rect(0,pos,160,20,LCD.RED)
+  
         display_text()
     
     def btn_handler():
