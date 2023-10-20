@@ -12,6 +12,9 @@ if __name__=='__main__':
     
     delta_seconds = 0
     
+    pwm = PWM(Pin(lcd.BL))
+    pwm.freq(1000)
+    pwm.duty_u16(65535)#max 65535
     
     LCD = lcd.LCD_1inch8()
     LCD.show()
