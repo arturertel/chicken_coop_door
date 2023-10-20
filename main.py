@@ -49,6 +49,13 @@ if __name__=='__main__':
 
     mode = 0
 
+    standby_timer = Timer(-1)
+    
+    def go_on_standby(timer):
+        print("standby")
+        for fade in range(65535, 0, -1):
+            pwm.duty_u16(fade)#max 65535
+
     def menu(mode):
         def display_text():
 
@@ -100,6 +107,7 @@ if __name__=='__main__':
         # mode switch
         if (btn_01.value() == True) and btn_01_prev_state == False:
             btn_01_prev_state = True
+            pwm.duty_u16(65535)#max 65535
             mode = mode + 1
             mode = mode % 5
             menu(mode)
@@ -107,9 +115,11 @@ if __name__=='__main__':
             
         elif (btn_01.value() == False) and btn_01_prev_state == True:
             btn_01_prev_state = False
+            standby_timer.init(mode=Timer.ONE_SHOT, period=10000, callback=go_on_standby)
 
         elif (btn_02.value() == True) and btn_02_prev_state == False:
             btn_02_prev_state = True
+            pwm.duty_u16(65535)#max 65535
             mode = mode - 1
             mode = mode % 5
             menu(mode)
@@ -118,9 +128,11 @@ if __name__=='__main__':
         elif (btn_02.value() == False) and btn_02_prev_state == True:
             btn_02_prev_state = False
         
+            standby_timer.init(mode=Timer.ONE_SHOT, period=10000, callback=go_on_standby)
         # hour switch
         elif (btn_03.value() == True) and btn_03_prev_state == False:
             btn_03_prev_state = True
+            pwm.duty_u16(65535)#max 65535
             if mode == 0:
                 momentary_hour = momentary_hour + 1
                 momentary_hour = momentary_hour & 24
@@ -131,12 +143,15 @@ if __name__=='__main__':
             elif mode == 2:
                 close_hour = close_hour + 1
                 close_hour = close_hour % 24
+            
 
         elif (btn_03.value() == False) and btn_03_prev_state == True:
             btn_03_prev_state = False
+            standby_timer.init(mode=Timer.ONE_SHOT, period=10000, callback=go_on_standby)
 
         elif (btn_04.value() == True) and btn_04_prev_state == False:
             btn_04_prev_state = True
+            pwm.duty_u16(65535)#max 65535
             if mode == 0:
                 momentary_hour = momentary_hour - 1
                 momentary_hour = momentary_hour & 24
@@ -150,9 +165,11 @@ if __name__=='__main__':
                     
         elif (btn_04.value() == False) and btn_04_prev_state == True:
             btn_04_prev_state = False
+            standby_timer.init(mode=Timer.ONE_SHOT, period=10000, callback=go_on_standby)
 
         elif (btn_05.value() == True) and btn_05_prev_state == False:
             btn_05_prev_state = True
+            pwm.duty_u16(65535)#max 65535
             if mode == 0:
                 momentary_min = momentary_min +1
                 momentary_min = momentary_min % 60
@@ -168,9 +185,11 @@ if __name__=='__main__':
                 
         elif (btn_05.value() == False) and btn_05_prev_state == True:
             btn_05_prev_state = False
+            standby_timer.init(mode=Timer.ONE_SHOT, period=10000, callback=go_on_standby)
 
         elif (btn_06.value() == True) and btn_06_prev_state == False:
             btn_06_prev_state = True
+            pwm.duty_u16(65535)#max 65535
             if mode == 0:
                 momentary_min = momentary_min - 1
                 momentary_min = momentary_min % 60
@@ -187,6 +206,7 @@ if __name__=='__main__':
         elif (btn_06.value() == False) and btn_06_prev_state == True:
             btn_06_prev_state = False
     
+            standby_timer.init(mode=Timer.ONE_SHOT, period=10000, callback=go_on_standby)
     def get_current_time_with_delta():
         current_time = time.time()
         
