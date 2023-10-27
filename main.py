@@ -2,13 +2,11 @@ from machine import PWM, Pin, Timer
 import lcd
 import time
 
-global mode
-
+global mode_switch
 # time in seconds that we differ from system time
 global delta_seconds
-
+global lcd_awake
 if __name__ == '__main__':
-
     delta_seconds = 0
 
     pwm = PWM(Pin(lcd.BL))
@@ -18,20 +16,11 @@ if __name__ == '__main__':
     LCD = lcd.LCD_1inch8()
     LCD.show()
 
-    btn_01 = Pin(0, Pin.IN, Pin.PULL_DOWN)
-    btn_01_prev_state = btn_01.value()
-    btn_02 = Pin(1, Pin.IN, Pin.PULL_DOWN)
-    btn_02_prev_state = btn_02.value()
+    limit_switch_open = Pin(26, Pin.IN, Pin.PULL_DOWN)
+    limit_switch_open_prev_state = limit_switch_open.value()
 
-    btn_03 = Pin(2, Pin.IN, Pin.PULL_DOWN)
-    btn_03_prev_state = btn_03.value()
-    btn_04 = Pin(3, Pin.IN, Pin.PULL_DOWN)
-    btn_04_prev_state = btn_04.value()
-
-    btn_05 = Pin(4, Pin.IN, Pin.PULL_DOWN)
-    btn_05_prev_state = btn_05.value()
-    btn_06 = Pin(5, Pin.IN, Pin.PULL_DOWN)
-    btn_06_prev_state = btn_06.value()
+    limit_switch_close = Pin(22, Pin.IN, Pin.PULL_DOWN)
+    limit_switch_close_prev_state = limit_switch_close.value()
 
     momentary_hour = 0
     momentary_min = 0
@@ -43,164 +32,213 @@ if __name__ == '__main__':
     close_hour = 20
     close_min = 0
 
-    mode = 3
+    mode_switch = 0
 
     standby_timer = Timer(-1)
 
 
-    def go_on_standby(timer):
-        print("standby")
+    class Btn:
+        def __init__(self, pin):
+            self.pin = pin
+            self.btn_prev_state = False
+            self.btn = Pin(self.pin, Pin.IN, Pin.PULL_DOWN)
+            global lcd_awake
+            lcd_awake = True
+
+        def activate(self, other):
+            global lcd_awake
+            if self.btn.value() == True and self.btn_prev_state == False:
+                self.btn_prev_state = True
+                if not lcd_awake:
+                    lcd_awake = True
+                    lcd_wake_up()
+
+                    pass
+                else:
+                    # call function
+                    other()
+            elif (self.btn.value() == False) and self.btn_prev_state == True:
+                self.btn_prev_state = False
+                standby_timer.init(mode=Timer.ONE_SHOT, period=10000, callback=lcd_fall_asleep)
+
+
+    class DisplayMode:
+        def __init__(self, title, position):
+            self.title = title
+            self.position = position
+            self.text_pos = self.position * 20
+
+        def show_text(self, text_color=LCD.BLUE, bg_color=LCD.BLACK):
+            LCD.fill_rect(0, self.text_pos, 160, 20, bg_color)
+            LCD.text(self.title, 2, self.text_pos + 6, text_color)
+
+        def update(self):
+
+            # highlight active mode
+            if self.position == mode_switch:
+                self.show_text(LCD.RED)
+            else:
+                self.show_text()
+
+
+    class TimeDisplaymode(DisplayMode):
+        def __init__(self, title, position):
+            super().__init__(title, position)
+
+        def show_text(self, text_color=LCD.BLUE, bg_color=LCD.BLACK):
+            LCD.fill_rect(0, self.text_pos, 160, 20, bg_color)
+            LCD.text(self.title, 2, self.text_pos + 6, text_color)
+            self.hour, self.minute, self.second = get_current_time_with_delta()
+
+            LCD.text(
+                "{0:0=2d}".format(self.hour) + ":" + "{0:0=2d}".format(self.minute) + ":" + "{0:0=2d}".format(
+                    self.second),
+                70, self.text_pos + 6, text_color)
+
+
+    class OpenDisplaymode(DisplayMode):
+        def __init__(self, title, position):
+            super().__init__(title, position)
+
+        def show_text(self, text_color=LCD.BLUE, bg_color=LCD.BLACK):
+            LCD.fill_rect(0, self.text_pos, 160, 20, bg_color)
+            LCD.text(self.title, 2, self.text_pos + 6, text_color)
+            LCD.text("{0:0=2d}".format(open_hour) + ":" + "{0:0=2d}".format(open_min), 70, self.text_pos + 6,
+                     text_color)
+
+
+    class CloseDisplaymode(DisplayMode):
+        def __init__(self, title, position):
+            super().__init__(title, position)
+
+        def show_text(self, text_color=LCD.BLUE, bg_color=LCD.BLACK):
+            LCD.fill_rect(0, self.text_pos, 160, 20, bg_color)
+            LCD.text(self.title, 2, self.text_pos + 6, text_color)
+            LCD.text("{0:0=2d}".format(close_hour) + ":" + "{0:0=2d}".format(close_min), 70, self.text_pos + 6,
+                     text_color)
+
+
+    # lcd standby functions
+    def lcd_fall_asleep(time):
+        global lcd_awake
+        lcd_awake = False
+        print("lcd goes to sleep")
         for fade in range(65535, 0, -1):
             pwm.duty_u16(fade)  # max 65535
 
 
-    def menu(mode_number):
-        def display_text():
-            (hour, minute, second) = get_current_time_with_delta()
-            LCD.text("Time:", 2, 6, LCD.WHITE)
-            LCD.text("{0:0=2d}".format(hour) + ":" + "{0:0=2d}".format(minute) + ":" + "{0:0=2d}".format(second), 60, 6,
-                     LCD.WHITE)
-
-            LCD.text("Open:", 2, 26, LCD.WHITE)
-            LCD.text("{0:0=2d}".format(open_hour) + ":" + "{0:0=2d}".format(open_min), 60, 26, LCD.WHITE)
-
-            LCD.text("Close:", 2, 46, LCD.WHITE)
-            LCD.text("{0:0=2d}".format(close_hour) + ":" + "{0:0=2d}".format(close_min), 60, 46, LCD.WHITE)
-
-            LCD.text("Manual", 2, 66, LCD.WHITE)
-
-            LCD.text("Automatic", 2, 86, LCD.WHITE)
-
-        # bg
-        LCD.fill_rect(0, 0, 160, 128, LCD.BLACK)
-        # highlight
-        pos = mode_number * 20
-        LCD.fill_rect(0, pos, 160, 20, LCD.RED)
-
-        display_text()
+    def lcd_wake_up():
+        print("lcd is awake")
+        pwm.duty_u16(65535)  # max 65535
 
 
-    def btn_handler():
-        global mode
-        global btn_01_prev_state
-        global btn_02_prev_state
-        global btn_03_prev_state
-        global btn_04_prev_state
-        global btn_05_prev_state
-        global btn_06_prev_state
+    # button functions
+    def plus_mode():
+        global mode_switch
+        mode_switch = mode_switch + 1
+        mode_switch = mode_switch % 5
+        return mode_switch
 
+
+    def minus_mode():
+        global mode_switch
+        mode_switch = mode_switch - 1
+        mode_switch = mode_switch % 5
+        print("mode= ", mode_switch)
+        return mode_switch
+
+
+    def plus_hour():
         global momentary_hour
-        global momentary_min
-
         global open_hour
-        global open_min
-
         global close_hour
-        global close_min
-
         global delta_seconds
 
-        # mode switch
-        if (btn_01.value() == True) and btn_01_prev_state == False:
-            btn_01_prev_state = True
-            pwm.duty_u16(65535)  # max 65535
-            mode = mode + 1
-            mode = mode % 5
-            menu(mode)
-            print("mode= ", mode)
+        if mode_switch == 0:
+            momentary_hour = momentary_hour + 1
+            momentary_hour = momentary_hour & 24
+            delta_seconds = delta_seconds + (60 * 60)  # 1 hour
+        elif mode_switch == 1:
+            open_hour = open_hour + 1
+            open_hour = open_hour % 24
+        elif mode_switch == 2:
+            close_hour = close_hour + 1
+            close_hour = close_hour % 24
 
-        elif (btn_01.value() == False) and btn_01_prev_state == True:
-            btn_01_prev_state = False
-            standby_timer.init(mode=Timer.ONE_SHOT, period=10000, callback=go_on_standby)
 
-        elif (btn_02.value() == True) and btn_02_prev_state == False:
-            btn_02_prev_state = True
-            pwm.duty_u16(65535)  # max 65535
-            mode = mode - 1
-            mode = mode % 5
-            menu(mode)
-            print("mode= ", mode)
+    def minus_hour():
+        global momentary_hour
+        global open_hour
+        global close_hour
+        global delta_seconds
 
-        elif (btn_02.value() == False) and btn_02_prev_state == True:
-            btn_02_prev_state = False
+        if mode_switch == 0:
+            momentary_hour = momentary_hour - 1
+            momentary_hour = momentary_hour & 24
+            delta_seconds = delta_seconds - (60 * 60)  # 1 hour
+        elif mode_switch == 1:
+            open_hour = open_hour - 1
+            open_hour = open_hour % 24
+        elif mode_switch == 2:
+            close_hour = close_hour - 1
+            close_hour = close_hour % 24
 
-            standby_timer.init(mode=Timer.ONE_SHOT, period=10000, callback=go_on_standby)
-        # hour switch
-        elif (btn_03.value() == True) and btn_03_prev_state == False:
-            btn_03_prev_state = True
-            pwm.duty_u16(65535)  # max 65535
-            if mode == 0:
-                momentary_hour = momentary_hour + 1
-                momentary_hour = momentary_hour & 24
-                delta_seconds = delta_seconds + (60 * 60)  # 1 hour
-            elif mode == 1:
-                open_hour = open_hour + 1
-                open_hour = open_hour % 24
-            elif mode == 2:
-                close_hour = close_hour + 1
-                close_hour = close_hour % 24
-        elif (btn_03.value() == False) and btn_03_prev_state == True:
-            btn_03_prev_state = False
-            standby_timer.init(mode=Timer.ONE_SHOT, period=10000, callback=go_on_standby)
 
-        elif (btn_04.value() == True) and btn_04_prev_state == False:
-            btn_04_prev_state = True
-            pwm.duty_u16(65535)  # max 65535
-            if mode == 0:
-                momentary_hour = momentary_hour - 1
-                momentary_hour = momentary_hour & 24
-                delta_seconds = delta_seconds - (60 * 60)  # 1 hour
-            elif mode == 1:
-                open_hour = open_hour - 1
-                open_hour = open_hour % 24
-            elif mode == 2:
-                close_hour = close_hour - 1
-                close_hour = close_hour % 24
+    def plus_min():
+        global momentary_min
+        global open_min
+        global close_min
+        global delta_seconds
+        if mode_switch == 0:
+            momentary_min = momentary_min + 1
+            momentary_min = momentary_min % 60
+            delta_seconds = delta_seconds + 60  # 1 minute
 
-        elif btn_04.value() == False and btn_04_prev_state == True:
-            btn_04_prev_state = False
-            standby_timer.init(mode=Timer.ONE_SHOT, period=10000, callback=go_on_standby)
+        elif mode_switch == 1:
+            open_min = open_min + 1
+            open_min = open_min % 60
 
-        elif btn_05.value() == True and btn_05_prev_state == False:
-            btn_05_prev_state = True
-            pwm.duty_u16(65535)  # max 65535
-            if mode == 0:
-                momentary_min = momentary_min + 1
-                momentary_min = momentary_min % 60
-                delta_seconds = delta_seconds + 60  # 1 minute
+        elif mode_switch == 2:
+            close_min = close_min + 1
+            close_min = close_min % 60
 
-            elif mode == 1:
-                open_min = open_min + 1
-                open_min = open_min % 60
 
-            elif mode == 2:
-                close_min = close_min + 1
-                close_min = close_min % 60
+    def minus_min():
+        global momentary_min
+        global open_min
+        global close_min
+        global delta_seconds
+        if mode_switch == 0:
+            momentary_min = momentary_min - 1
+            momentary_min = momentary_min % 60
+            delta_seconds = delta_seconds + 60  # 1 minute
 
-        elif btn_05.value() == False and btn_05_prev_state == True:
-            btn_05_prev_state = False
-            standby_timer.init(mode=Timer.ONE_SHOT, period=10000, callback=go_on_standby)
+        elif mode_switch == 1:
+            open_min = open_min - 1
+            open_min = open_min % 60
 
-        elif btn_06.value() == True and btn_06_prev_state == False:
-            btn_06_prev_state = True
-            pwm.duty_u16(65535)  # max 65535
-            if mode == 0:
-                momentary_min = momentary_min - 1
-                momentary_min = momentary_min % 60
+        elif mode_switch == 2:
+            close_min = close_min - 1
+            close_min = close_min % 60
 
-                delta_seconds = delta_seconds - 60  # 1 minute
-            elif mode == 1:
-                open_min = open_min - 1
-                open_min = open_min % 60
 
-            elif mode == 2:
-                close_min = close_min - 1
-                close_min = close_min % 60
+    def door_up():
+        print("up")
 
-        elif btn_06.value() == False and btn_06_prev_state == True:
-            btn_06_prev_state = False
 
-            standby_timer.init(mode=Timer.ONE_SHOT, period=10000, callback=go_on_standby)
+    def door_down():
+        print("down")
+
+
+    # Create Buttons
+    btn_01 = Btn(0)
+    btn_02 = Btn(1)
+
+    btn_03 = Btn(2)
+    btn_04 = Btn(3)
+
+    btn_05 = Btn(4)
+    btn_06 = Btn(5)
 
 
     def get_current_time_with_delta():
@@ -211,17 +249,65 @@ if __name__ == '__main__':
         return hour, minute, second
 
 
+    # create different modes
+    time_mode = TimeDisplaymode(title="Time", position=0)
+    open_mode = OpenDisplaymode(title="Open", position=1)
+    close_mode = CloseDisplaymode(title="Close", position=2)
+    manual_mode = DisplayMode(title="Manual", position=3)
+    automatic_mode = DisplayMode(title="Automatic", position=4)
+
     while True:
 
-        btn_handler()
+        time_mode.update()
+        open_mode.update()
+        close_mode.update()
+        manual_mode.update()
+        automatic_mode.update()
 
-        if mode == 4:
+        # change mode
+        btn_01.activate(plus_mode)
+        btn_02.activate(minus_mode)
+
+        if mode_switch == 0:
+            # change hour
+            btn_03.activate(plus_hour)
+            btn_04.activate(minus_hour)
+            # change minute
+            btn_05.activate(plus_min)
+            btn_06.activate(minus_min)
+
+        if mode_switch == 1:
+            # change hour
+            btn_03.activate(plus_hour)
+            btn_04.activate(minus_hour)
+            # change minute
+            btn_05.activate(plus_min)
+            btn_06.activate(minus_min)
+
+        if mode_switch == 2:
+            # change hour
+            btn_03.activate(plus_hour)
+            btn_04.activate(minus_hour)
+            # change minute
+            btn_05.activate(plus_min)
+            btn_06.activate(minus_min)
+
+        if mode_switch == 3:
+            # manual
+            # if the limit switch 01 is not active:
+            btn_04.activate(door_up)
+            btn_06.activate(door_up)
+            # if the limit switch 02 is not active:
+            btn_03.activate(door_down)
+            btn_05.activate(door_down)
+
+        if mode_switch == 4:
+            # this function must be checked again
             # automatic
             # compare the time
-            if (momentary_hour == open_hour) and (momentary_min == open_min):
-                print("Opens door")
+            if momentary_hour == open_hour and momentary_min == open_min:
+                btn_03.activate(door_up)
             if (momentary_hour == close_hour) and (momentary_min == close_min):
-                print("Closes the door")
+                btn_04.activate(door_down)
 
-        menu(mode)
         LCD.show()
