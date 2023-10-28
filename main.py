@@ -64,7 +64,7 @@ if __name__ == '__main__':
                 else:
                     # call function
                     other()
-                    print("btn", self.pin,"pressed")
+                    print("btn", self.pin)
 
             elif (self.btn.value() == False) and self.btn_prev_state == True:
                 self.btn_prev_state = False
