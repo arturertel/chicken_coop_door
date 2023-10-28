@@ -210,7 +210,7 @@ if __name__ == '__main__':
         if mode_switch == 0:
             momentary_min = momentary_min - 1
             momentary_min = momentary_min % 60
-            delta_seconds = delta_seconds + 60  # 1 minute
+            delta_seconds = delta_seconds - 60  # 1 minute
 
         elif mode_switch == 1:
             open_min = open_min - 1
