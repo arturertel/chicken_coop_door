@@ -16,12 +16,6 @@ if __name__ == '__main__':
     LCD = lcd.LCD_1inch8()
     LCD.show()
 
-    limit_switch_open = Pin(26, Pin.IN, Pin.PULL_DOWN)
-    limit_switch_open_prev_state = limit_switch_open.value()
-
-    limit_switch_close = Pin(22, Pin.IN, Pin.PULL_DOWN)
-    limit_switch_close_prev_state = limit_switch_close.value()
-
     momentary_hour = 0
     momentary_min = 0
     momentary_sec = 0
@@ -32,7 +26,7 @@ if __name__ == '__main__':
     close_hour = 20
     close_min = 0
 
-    mode_switch = 0
+    mode_switch = 3
 
     standby_timer = Timer(-1)
 
@@ -42,11 +36,14 @@ if __name__ == '__main__':
             self.pin = pin
             self.btn_prev_state = False
             self.btn = Pin(self.pin, Pin.IN, Pin.PULL_DOWN)
+            self.value = self.btn.value
             global lcd_awake
             lcd_awake = True
 
         def activate(self, other):
             global lcd_awake
+            self.value = self.btn.value()
+
             if self.btn.value() == True and self.btn_prev_state == False:
                 self.btn_prev_state = True
                 if not lcd_awake:
@@ -76,7 +73,7 @@ if __name__ == '__main__':
 
             # highlight active mode
             if self.position == mode_switch:
-                self.show_text(LCD.RED)
+                self.show_text(LCD.WHITE)
             else:
                 self.show_text()
 
@@ -223,11 +220,15 @@ if __name__ == '__main__':
 
 
     def door_up():
-        print("up")
-
+        print("door_up_function")
+        if limit_switch_open.value() == False:
+            print("Door goes up")
+            
 
     def door_down():
-        print("down")
+        print("door_down_function")
+        if limit_switch_close.value() == False:
+            print("Door goes down")
 
 
     # Create Buttons
@@ -239,6 +240,9 @@ if __name__ == '__main__':
 
     btn_05 = Btn(4)
     btn_06 = Btn(5)
+    
+    limit_switch_open = Btn(22)
+    limit_switch_close= Btn(26)
 
 
     def get_current_time_with_delta():
@@ -291,6 +295,7 @@ if __name__ == '__main__':
             # change minute
             btn_05.activate(plus_min)
             btn_06.activate(minus_min)
+
 
         if mode_switch == 3:
             # manual
