@@ -54,6 +54,8 @@ if __name__ == '__main__':
                 else:
                     # call function
                     other()
+                    print("btn", self.pin,"pressed")
+
             elif (self.btn.value() == False) and self.btn_prev_state == True:
                 self.btn_prev_state = False
                 standby_timer.init(mode=Timer.ONE_SHOT, period=10000, callback=lcd_fall_asleep)
@@ -232,14 +234,14 @@ if __name__ == '__main__':
 
 
     # Create Buttons
-    btn_01 = Btn(0)
-    btn_02 = Btn(1)
+    btn04 = Btn(4)
+    btn05 = Btn(5)
 
-    btn_03 = Btn(2)
-    btn_04 = Btn(3)
+    btn01 = Btn(1)
+    btn00 = Btn(0)
 
-    btn_05 = Btn(4)
-    btn_06 = Btn(5)
+    btn03 = Btn(3)
+    btn02 = Btn(2)
     
     limit_switch_open = Btn(22)
     limit_switch_close= Btn(26)
@@ -269,50 +271,50 @@ if __name__ == '__main__':
         automatic_mode.update()
 
         # change mode
-        btn_01.activate(plus_mode)
-        btn_02.activate(minus_mode)
+        btn04.activate(plus_mode)
+        btn05.activate(minus_mode)
 
         if mode_switch == 0:
             # change hour
-            btn_03.activate(plus_hour)
-            btn_04.activate(minus_hour)
+            btn01.activate(plus_hour)
+            btn00.activate(minus_hour)
             # change minute
-            btn_05.activate(plus_min)
-            btn_06.activate(minus_min)
+            btn03.activate(plus_min)
+            btn02.activate(minus_min)
 
         if mode_switch == 1:
             # change hour
-            btn_03.activate(plus_hour)
-            btn_04.activate(minus_hour)
+            btn01.activate(plus_hour)
+            btn00.activate(minus_hour)
             # change minute
-            btn_05.activate(plus_min)
-            btn_06.activate(minus_min)
+            btn03.activate(plus_min)
+            btn02.activate(minus_min)
 
         if mode_switch == 2:
             # change hour
-            btn_03.activate(plus_hour)
-            btn_04.activate(minus_hour)
+            btn01.activate(plus_hour)
+            btn00.activate(minus_hour)
             # change minute
-            btn_05.activate(plus_min)
-            btn_06.activate(minus_min)
+            btn03.activate(plus_min)
+            btn02.activate(minus_min)
 
 
         if mode_switch == 3:
             # manual
             # if the limit switch 01 is not active:
-            btn_04.activate(door_up)
-            btn_06.activate(door_up)
+            btn00.activate(door_up)
+            btn02.activate(door_up)
             # if the limit switch 02 is not active:
-            btn_03.activate(door_down)
-            btn_05.activate(door_down)
+            btn01.activate(door_down)
+            btn03.activate(door_down)
 
         if mode_switch == 4:
             # this function must be checked again
             # automatic
             # compare the time
             if momentary_hour == open_hour and momentary_min == open_min:
-                btn_03.activate(door_up)
+                btn01.activate(door_up)
             if (momentary_hour == close_hour) and (momentary_min == close_min):
-                btn_04.activate(door_down)
+                btn00.activate(door_down)
 
         LCD.show()
