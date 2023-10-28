@@ -1,20 +1,28 @@
 from machine import PWM, Pin, Timer
 import lcd
 import time
+from time import sleep
 
 global mode_switch
 # time in seconds that we differ from system time
 global delta_seconds
 global lcd_awake
+global motor_state
+motor_state = "stopp"
 if __name__ == '__main__':
     delta_seconds = 0
 
-    pwm = PWM(Pin(lcd.BL))
-    pwm.freq(1000)
-    pwm.duty_u16(65535)  # max 65535
+    lcd_pwm = PWM(Pin(lcd.BL))  # BL = pin 13
+    lcd_pwm.freq(1000)
+    lcd_pwm.duty_u16(65535)  # max 65535
 
     LCD = lcd.LCD_1inch8()
     LCD.show()
+
+    motor_pwm = PWM(Pin(16))
+    motor_direction = Pin(28, Pin.OUT)
+    # Set PWM frequency
+    motor_pwm.freq(5000)
 
     momentary_hour = 0
     momentary_min = 0
@@ -39,9 +47,11 @@ if __name__ == '__main__':
             self.value = self.btn.value
             global lcd_awake
             lcd_awake = True
-
+            global motor_state
         def activate(self, other):
             global lcd_awake
+            global motor_state
+
             self.value = self.btn.value()
 
             if self.btn.value() == True and self.btn_prev_state == False:
@@ -59,7 +69,7 @@ if __name__ == '__main__':
             elif (self.btn.value() == False) and self.btn_prev_state == True:
                 self.btn_prev_state = False
                 standby_timer.init(mode=Timer.ONE_SHOT, period=10000, callback=lcd_fall_asleep)
-
+                motor_state = "stopp"
 
     class DisplayMode:
         def __init__(self, title, position):
@@ -123,12 +133,12 @@ if __name__ == '__main__':
         lcd_awake = False
         print("lcd goes to sleep")
         for fade in range(65535, 0, -1):
-            pwm.duty_u16(fade)  # max 65535
+            lcd_pwm.duty_u16(fade)  # max 65535
 
 
     def lcd_wake_up():
         print("lcd is awake")
-        pwm.duty_u16(65535)  # max 65535
+        lcd_pwm.duty_u16(65535)  # max 65535
 
 
     # button functions
@@ -222,29 +232,31 @@ if __name__ == '__main__':
 
 
     def door_up():
-        print("door_up_function")
-        if limit_switch_open.value() == False:
-            print("Door goes up")
-            
+        global motor_state
+        global motor_direction
+        motor_direction.value(0)
+        motor_state = "up"
+        print("motor_state:", motor_state)
 
     def door_down():
-        print("door_down_function")
-        if limit_switch_close.value() == False:
-            print("Door goes down")
+        global motor_state
+        global motor_direction
+        motor_direction.value(1)
+        motor_state = "down"
+        print("motor_state:", motor_state)
+
 
 
     # Create Buttons
+    btn00 = Btn(0)
+    btn01 = Btn(1)
+    btn02 = Btn(2)
+    btn03 = Btn(3)
     btn04 = Btn(4)
     btn05 = Btn(5)
 
-    btn01 = Btn(1)
-    btn00 = Btn(0)
-
-    btn03 = Btn(3)
-    btn02 = Btn(2)
-    
     limit_switch_open = Btn(22)
-    limit_switch_close= Btn(26)
+    limit_switch_close = Btn(26)
 
 
     def get_current_time_with_delta():
@@ -255,6 +267,7 @@ if __name__ == '__main__':
         return hour, minute, second
 
 
+
     # create different modes
     time_mode = TimeDisplaymode(title="Time", position=0)
     open_mode = OpenDisplaymode(title="Open", position=1)
@@ -262,59 +275,113 @@ if __name__ == '__main__':
     manual_mode = DisplayMode(title="Manual", position=3)
     automatic_mode = DisplayMode(title="Automatic", position=4)
 
-    while True:
-
-        time_mode.update()
-        open_mode.update()
-        close_mode.update()
-        manual_mode.update()
-        automatic_mode.update()
-
-        # change mode
-        btn04.activate(plus_mode)
-        btn05.activate(minus_mode)
-
-        if mode_switch == 0:
-            # change hour
-            btn01.activate(plus_hour)
-            btn00.activate(minus_hour)
-            # change minute
-            btn03.activate(plus_min)
-            btn02.activate(minus_min)
-
-        if mode_switch == 1:
-            # change hour
-            btn01.activate(plus_hour)
-            btn00.activate(minus_hour)
-            # change minute
-            btn03.activate(plus_min)
-            btn02.activate(minus_min)
-
-        if mode_switch == 2:
-            # change hour
-            btn01.activate(plus_hour)
-            btn00.activate(minus_hour)
-            # change minute
-            btn03.activate(plus_min)
-            btn02.activate(minus_min)
+    #led = Pin(25, Pin.OUT)
 
 
-        if mode_switch == 3:
-            # manual
-            # if the limit switch 01 is not active:
-            btn00.activate(door_up)
-            btn02.activate(door_up)
-            # if the limit switch 02 is not active:
-            btn01.activate(door_down)
-            btn03.activate(door_down)
+    # def tick(timer):
+    #     if btn04.value or btn05.value == True:
+    #         return
+    #     else:
+    #         motor_pwm.duty_u16(65000)
+    #         return (tick)
+    #
+    #
+    # Timer().init(freq=5, mode=Timer.PERIODIC, callback=tick)
 
-        if mode_switch == 4:
-            # this function must be checked again
-            # automatic
-            # compare the time
-            if momentary_hour == open_hour and momentary_min == open_min:
-                btn01.activate(door_up)
-            if (momentary_hour == close_hour) and (momentary_min == close_min):
-                btn00.activate(door_down)
 
-        LCD.show()
+    try:
+        while True:
+
+            time_mode.update()
+            open_mode.update()
+            close_mode.update()
+            manual_mode.update()
+            automatic_mode.update()
+
+            # change mode
+            btn04.activate(plus_mode)
+            btn05.activate(minus_mode)
+
+            if mode_switch == 0:
+                # change hour
+                btn01.activate(plus_hour)
+                btn00.activate(minus_hour)
+                # change minute
+                btn03.activate(plus_min)
+                btn02.activate(minus_min)
+
+            if mode_switch == 1:
+                # change hour
+                btn01.activate(plus_hour)
+                btn00.activate(minus_hour)
+                # change minute
+                btn03.activate(plus_min)
+                btn02.activate(minus_min)
+
+            if mode_switch == 2:
+                # change hour
+                btn01.activate(plus_hour)
+                btn00.activate(minus_hour)
+                # change minute
+                btn03.activate(plus_min)
+                btn02.activate(minus_min)
+
+            if mode_switch == 3:
+                # manual
+                # if the limit switch 01 is not active:
+                btn00.activate(door_up)
+                btn02.activate(door_up)
+                # if the limit switch 02 is not active:
+                btn01.activate(door_down)
+                btn03.activate(door_down)
+
+            #         if mode_switch == 4:
+            #             # this function must be checked again
+            #             # automatic
+            #             # compare the time
+            #             if momentary_hour == open_hour and momentary_min == open_min:
+            #                 btn01.activate(door_up)
+            #             if (momentary_hour == close_hour) and (momentary_min == close_min):
+            #                 btn00.activate(door_down)
+
+            # motor
+            duty_step = 129  # Step size for changing the duty cycle
+            if motor_state == "up":
+                # Increase the duty cycle gradually
+                for duty_cycle in range(0, 65536, duty_step):
+                    motor_pwm.duty_u16(duty_cycle)
+                    sleep(0.005)
+
+                # Decrease the duty cycle gradually
+                for duty_cycle in range(65536, 0, -duty_step):
+                    motor_pwm.duty_u16(duty_cycle)
+                    sleep(0.005)
+###
+
+            if motor_state == "down":
+                # Increase the duty cycle gradually
+                for duty_cycle in range(0, 65536, duty_step):
+                    motor_pwm.duty_u16(duty_cycle)
+                    sleep(0.005)
+
+                # Decrease the duty cycle gradually
+                for duty_cycle in range(65536, 0, -duty_step):
+                    motor_pwm.duty_u16(duty_cycle)
+                    sleep(0.005)
+
+            if limit_switch_open.value() == True or limit_switch_close.value() == True:
+                motor_state = "stopp"
+
+            if motor_state == "stopp":
+                motor_pwm.duty_u16(0)
+                motor_pwm.deinit()
+
+            LCD.show()
+
+    except KeyboardInterrupt:
+        print("Keyboard interrupt")
+        motor_pwm.duty_u16(0)
+        print(motor_pwm)
+        motor_pwm.deinit()
+
+

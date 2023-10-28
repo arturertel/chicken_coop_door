@@ -2,7 +2,7 @@ from machine import Pin, PWM
 from time import sleep    
 
 
-pwm = PWM(Pin(27))
+pwm = PWM(Pin(16))
 duty_step = 129  # Step size for changing the duty cycle
 direction = Pin(28, Pin.OUT)
 
