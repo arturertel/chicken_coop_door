@@ -7,8 +7,6 @@ global mode_switch
 # time in seconds that we differ from system time
 global delta_seconds
 global lcd_awake
-global motor_state
-motor_state = "stopp"
 if __name__ == '__main__':
     delta_seconds = 0
 
@@ -18,11 +16,6 @@ if __name__ == '__main__':
 
     LCD = lcd.LCD_1inch8()
     LCD.show()
-
-    motor_pwm = PWM(Pin(16))
-    motor_direction = Pin(28, Pin.OUT)
-    # Set PWM frequency
-    motor_pwm.freq(5000)
 
     momentary_hour = 0
     momentary_min = 0
@@ -39,6 +32,41 @@ if __name__ == '__main__':
     standby_timer = Timer(-1)
 
 
+    class Motor:
+        def __init__(self, pwm_pin, direction_pin):
+            self.pwm_pin = pwm_pin
+            self.direction_pin = direction_pin
+            self.motor_prev_state = False
+
+            self.pwm = PWM(Pin(pwm_pin))
+            self.motor_direction = Pin(direction_pin, Pin.OUT)
+            # Set PWM frequency
+            self.pwm.freq(5000)
+            self.rotation = None
+
+        def start(self):
+            if self.rotation == "cw":
+                self.motor_direction.value(1)
+            elif self.rotation == "ccw":
+                self.motor_direction.value(0)
+            self.pwm.freq(5000)
+            # motor_pwm.duty_u16(65536)
+            duty_step = 129
+            for duty_cycle in range(0, 65536, duty_step):
+                self.pwm.duty_u16(duty_cycle)
+                sleep(0.005)
+
+        #     for duty_cycle in range(65536, 0, -duty_step):
+        #         motor_pwm.duty_u16(duty_cycle)
+        #         sleep(0.005)
+
+        def stop(self):
+            self.pwm.duty_u16(0)
+            self.pwm.deinit()
+
+
+
+
     class Btn:
         def __init__(self, pin):
             self.pin = pin
@@ -47,10 +75,9 @@ if __name__ == '__main__':
             self.value = self.btn.value
             global lcd_awake
             lcd_awake = True
-            global motor_state
+
         def activate(self, other):
             global lcd_awake
-            global motor_state
 
             self.value = self.btn.value()
 
@@ -69,7 +96,7 @@ if __name__ == '__main__':
             elif (self.btn.value() == False) and self.btn_prev_state == True:
                 self.btn_prev_state = False
                 standby_timer.init(mode=Timer.ONE_SHOT, period=10000, callback=lcd_fall_asleep)
-                motor_state = "stopp"
+
 
     class DisplayMode:
         def __init__(self, title, position):
@@ -146,6 +173,7 @@ if __name__ == '__main__':
         global mode_switch
         mode_switch = mode_switch + 1
         mode_switch = mode_switch % 5
+        print("mode= ", mode_switch)
         return mode_switch
 
 
@@ -232,19 +260,12 @@ if __name__ == '__main__':
 
 
     def door_up():
-        global motor_state
         global motor_direction
         motor_direction.value(0)
-        motor_state = "up"
-        print("motor_state:", motor_state)
 
     def door_down():
-        global motor_state
         global motor_direction
         motor_direction.value(1)
-        motor_state = "down"
-        print("motor_state:", motor_state)
-
 
 
     # Create Buttons
@@ -255,9 +276,13 @@ if __name__ == '__main__':
     btn04 = Btn(4)
     btn05 = Btn(5)
 
-    limit_switch_open = Btn(22)
-    limit_switch_close = Btn(26)
+    limit_switch_01 = Btn(22)
+    limit_switch_02 = Btn(26)
 
+
+    motor = Motor(pwm_pin=16, direction_pin=28)
+    motor.rotation = "ccw"
+    motor.start()
 
     def get_current_time_with_delta():
         current_time = time.time()
@@ -267,7 +292,6 @@ if __name__ == '__main__':
         return hour, minute, second
 
 
-
     # create different modes
     time_mode = TimeDisplaymode(title="Time", position=0)
     open_mode = OpenDisplaymode(title="Open", position=1)
@@ -275,8 +299,7 @@ if __name__ == '__main__':
     manual_mode = DisplayMode(title="Manual", position=3)
     automatic_mode = DisplayMode(title="Automatic", position=4)
 
-    #led = Pin(25, Pin.OUT)
-
+    # led = Pin(25, Pin.OUT)
 
     # def tick(timer):
     #     if btn04.value or btn05.value == True:
@@ -287,7 +310,6 @@ if __name__ == '__main__':
     #
     #
     # Timer().init(freq=5, mode=Timer.PERIODIC, callback=tick)
-
 
     try:
         while True:
@@ -343,45 +365,14 @@ if __name__ == '__main__':
             #                 btn01.activate(door_up)
             #             if (momentary_hour == close_hour) and (momentary_min == close_min):
             #                 btn00.activate(door_down)
+            
+            limit_switch_01.activate(motor.stop)
 
-            # motor
-            duty_step = 129  # Step size for changing the duty cycle
-            if motor_state == "up":
-                # Increase the duty cycle gradually
-                for duty_cycle in range(0, 65536, duty_step):
-                    motor_pwm.duty_u16(duty_cycle)
-                    sleep(0.005)
-
-                # Decrease the duty cycle gradually
-                for duty_cycle in range(65536, 0, -duty_step):
-                    motor_pwm.duty_u16(duty_cycle)
-                    sleep(0.005)
-###
-
-            if motor_state == "down":
-                # Increase the duty cycle gradually
-                for duty_cycle in range(0, 65536, duty_step):
-                    motor_pwm.duty_u16(duty_cycle)
-                    sleep(0.005)
-
-                # Decrease the duty cycle gradually
-                for duty_cycle in range(65536, 0, -duty_step):
-                    motor_pwm.duty_u16(duty_cycle)
-                    sleep(0.005)
-
-            if limit_switch_open.value() == True or limit_switch_close.value() == True:
-                motor_state = "stopp"
-
-            if motor_state == "stopp":
-                motor_pwm.duty_u16(0)
-                motor_pwm.deinit()
 
             LCD.show()
 
     except KeyboardInterrupt:
         print("Keyboard interrupt")
-        motor_pwm.duty_u16(0)
-        print(motor_pwm)
-        motor_pwm.deinit()
-
-
+        motor.pwm.duty_u16(0)
+        print(motor.pwm)
+        motor.pwm.deinit()
