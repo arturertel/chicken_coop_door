@@ -90,6 +90,7 @@ if __name__ == '__main__':
                     pass
                 else:
                     # call function
+                    # "other" is a placeholder, the brackets are for starting the function
                     other()
                     print("btn", self.pin)
 
