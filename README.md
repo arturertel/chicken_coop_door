@@ -9,5 +9,9 @@ Parts
 - On/Off Switch
 - RTC-DS1302 Module 
 - MAX14870 Single Brushed DC Motor Driver Carrier ( https://www.pololu.com/product/2961 )
+- DC 12V Brushed Motor
 - LM2596 Adjustable Step Down Converter for Motor 
 - Mini Step-Down Converter einstellbar 4,75-23V -> 1-17V / 3A for Raspberry pi pico
+- 2x limit switch
+- 2x 10A10 diode
+- prefboard, jumper wires
