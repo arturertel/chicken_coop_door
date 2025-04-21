@@ -1,5 +1,5 @@
 import uasyncio
-from menu import menu_loop
+from menu import menu_loop, sleep_control_loop
 from new_motor import MotorDriver
 from button_handler import Btn
 import global_state
@@ -53,7 +53,8 @@ async def main():
     await uasyncio.gather(
         menu_loop(),
         motor_loop(),
-        automatic_loop()
+        automatic_loop(),
+        sleep_control_loop()
     )
 
 uasyncio.run(main())

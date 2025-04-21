@@ -17,8 +17,54 @@ lcd_pwm.duty_u16(65535)
 LCD = lcd.LCD_1inch8()
 LCD.show()
 
+is_sleeping = False  # globaler Zustand
+async def fade_out():
+    global is_sleeping, lcd_pwm
+    if is_sleeping:
+        return
+    print("🌙 Display fade out...")
+    is_sleeping = True
+    for fade in range(65535, 0, -2000):
+        lcd_pwm.duty_u16(fade)
+        await uasyncio.sleep(0.01)
+    lcd_pwm.duty_u16(0)
+    lcd_pwm.deinit()
 
 
+async def fade_in():
+    global is_sleeping, lcd_pwm
+    if not is_sleeping:
+        return
+    print("🌞 Display wake up...")
+    lcd_pwm = PWM(Pin(lcd.BL))
+    lcd_pwm.freq(1000)
+    for fade in range(0, 65535, 1000):
+        lcd_pwm.duty_u16(fade)
+        await uasyncio.sleep(0.01)
+    lcd_pwm.duty_u16(65535)
+    is_sleeping = False
+
+async def sleep_control_loop():
+    global is_sleeping
+    timeout = 0
+
+    while True:
+        mode_index = global_state.mode_switch
+
+        if mode_index == 4:  # AUTOMATIC MODE
+            if not is_sleeping:
+                timeout += 1
+                if timeout >= 200:  # ca. 2 Sekunden (bei 10ms Delay)
+                    await fade_out()
+            # wenn bereits schläft, einfach weiter warten
+        else:
+            timeout = 0  # Reset, wenn Modus nicht automatic
+            if is_sleeping:
+                await fade_in()
+
+        await uasyncio.sleep(0.01)
+        
+        
 # --- DisplayMode Klassen ---
 class DisplayMode:
     _position = 0
@@ -32,12 +78,13 @@ class DisplayMode:
     def show_text(self, text_color=LCD.BLUE, bg_color=LCD.BLACK):
         LCD.fill_rect(0, self.text_pos, 160, 20, bg_color)
         LCD.text(self.title, 2, self.text_pos + 6, text_color)
-
+    
     def update(self):
         if self.position == global_state.mode_switch:
             self.show_text(LCD.WHITE)
         else:
             self.show_text()
+
 
 class TimeDisplaymode(DisplayMode):
     def show_text(self, text_color=LCD.BLUE, bg_color=LCD.BLACK):
@@ -45,25 +92,28 @@ class TimeDisplaymode(DisplayMode):
         text = "{:02}:{:02}:{:02}".format(ds.hour(), ds.minute(), ds.second())
         LCD.text(text, 70, self.text_pos + 6, text_color)
 
+
 class OpenDisplaymode(DisplayMode):
     def show_text(self, text_color=LCD.BLUE, bg_color=LCD.BLACK):
         # Wenn Zeiten gleich, Text in Rot anzeigen
         if settings.open == settings.close:
             bg_color = LCD.RED
-            
+
         super().show_text(text_color, bg_color)
         text = "{:02}:{:02}".format(settings.open[0], settings.open[1])
         LCD.text(text, 70, self.text_pos + 6, text_color)
+
 
 class CloseDisplaymode(DisplayMode):
     def show_text(self, text_color=LCD.BLUE, bg_color=LCD.BLACK):
         # Wenn Zeiten gleich, Text in Rot anzeigen
         if settings.open == settings.close:
             bg_color = LCD.RED
-            
+
         super().show_text(text_color, bg_color)
         text = "{:02}:{:02}".format(settings.close[0], settings.close[1])
         LCD.text(text, 70, self.text_pos + 6, text_color)
+
 
 # --- Modi erstellen ---
 time_mode = TimeDisplaymode("Time")
@@ -82,19 +132,20 @@ btn05 = Btn(pin=5)
 
 # --- Hilfsfunktionen ---
 
+
 def mode(choice, _=None):
     if choice == "-":
         global_state.mode_switch = (global_state.mode_switch - 1) % 5
     elif choice == "+":
         global_state.mode_switch = (global_state.mode_switch + 1) % 5
-    
+
     # Automatic-Modus blockieren, wenn Öffnungs- und Schließzeit gleich sind
     if settings.open == settings.close and global_state.mode_switch == 4:
         print("Automatik deaktiviert – Öffnungs- und Schließzeit sind gleich!")
         global_state.mode_switch = 2  # zurück zu open_mode
 
     print("mode =", global_state.mode_switch)
-    
+
 
 def change_time_unit(unit, change):
     if global_state.mode_switch == 0:
@@ -103,14 +154,18 @@ def change_time_unit(unit, change):
         getattr(ds, unit)(value)
     elif global_state.mode_switch == 1:
         index = 0 if unit == "hour" else 1
-        settings.open[index] = (settings.open[index] + change) % (24 if index == 0 else 60)
+        settings.open[index] = (settings.open[index] +
+                                change) % (24 if index == 0 else 60)
     elif global_state.mode_switch == 2:
         index = 0 if unit == "hour" else 1
-        settings.close[index] = (settings.close[index] + change) % (24 if index == 0 else 60)
+        settings.close[index] = (
+            settings.close[index] + change) % (24 if index == 0 else 60)
     settings.save()
 
 # --- Menü-Loop ---
-async  def menu_loop():
+
+
+async def menu_loop():
     while True:
         time_mode.update()
         open_mode.update()
