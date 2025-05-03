@@ -11,7 +11,9 @@ frequency = 1000
 
 pin1 = Pin(19, Pin.OUT)
 pin2 = Pin(20, Pin.OUT)
-enable = PWM(Pin(28), frequency)
+enable = PWM(Pin(28))
+enable.freq(1000)  # z. B. 1000 Hz
+
 dc_motor = DCMotor(pin1, pin2, enable)
 
 # Set min duty cycle (15000) and max duty cycle (65535)
@@ -61,7 +63,7 @@ async def run_motor(direction):
     await uasyncio.sleep(1)  # Kurze Pause, bevor der Motor startet
     if direction == 1:
         print('Forward with speed: 50%')
-        dc_motor.forward(50)
+        dc_motor.forward(70)
     elif direction == 0:
         print('Backwards with speed: 50%')
-        dc_motor.backwards(50)
+        dc_motor.backwards(70)

@@ -1,6 +1,5 @@
 import uasyncio
 from machine import Pin, PWM
-import time
 import lcd
 from button_handler import Btn
 from ds1302 import DS1302
